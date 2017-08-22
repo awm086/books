@@ -1,2 +1,8 @@
 <html>
+<h1>hello {{.Name}}</h1>
+{{ if .DBstatus }}
+    <p> connection is good</p>
+{{else}}
+    ls<p>db connection is dead</p>
+{{end}}
 </html>
