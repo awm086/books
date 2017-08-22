@@ -1,8 +1,53 @@
 <html>
-<h1>hello {{.Name}}</h1>
-{{ if .DBstatus }}
-    <p> connection is good</p>
-{{else}}
-    ls<p>db connection is dead</p>
-{{end}}
+<body>
+
+<form id="search" onsubmit="return false">
+    <input name="search"/>
+    <input type="submit" value="Search" onclick="submitSearch()"/>
+</form>
+
+<table width="100%">
+    <thead>
+    <tr style="">
+        <th width="40%">title</th>
+        <th width="30%">Author</th>
+        <th width="10%">
+            <Year
+            /th>
+        <th width="20%">ID</th>
+    </tr>
+    </thead>
+    <tbody id="search-results"></tbody>
+</table>
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js">
+</script>
+<script  type="text/javascript">
+    function submitSearch() {
+        console.log('submitting search');
+        $.ajax({
+            url: "/search",
+            method: "POST",
+            data: $("#search").serialize(),
+            success: function (d) {
+                var parsed = JSON.parse(d);
+                console.log(parsed)
+                if (!parsed) return;
+
+                var searchResult = $("#search-results");
+                searchResult.empty();
+
+                parsed.forEach(function (result) {
+                    var row = $("<tr><td>" + result.Title + "</td><td>" + result.Author +
+                        "</td><td>" + result.Year + "</td><td>" + result.ID + "</td></tr>")
+
+                    searchResult.append(row);
+
+                })
+            }
+        });
+
+        return false
+    }
+</script>
+</body>
 </html>
