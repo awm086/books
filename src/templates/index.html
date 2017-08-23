@@ -1,14 +1,14 @@
 <html>
 <body>
 
-<form id="search" onsubmit="return false">
+<form id="search-form" onsubmit="return false">
     <input name="search"/>
     <input type="submit" value="Search" onclick="submitSearch()"/>
 </form>
 
 <table width="100%">
     <thead>
-    <tr style="">
+    <tr style="text-align: left">
         <th width="40%">title</th>
         <th width="30%">Author</th>
         <th width="10%">
@@ -21,29 +21,31 @@
 </table>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js">
 </script>
-<script  type="text/javascript">
+<script type="text/javascript">
     function submitSearch() {
         console.log('submitting search');
         $.ajax({
             url: "/search",
             method: "POST",
-            data: $("#search").serialize(),
-            success: function (d) {
-                var parsed = JSON.parse(d);
-                console.log(parsed)
+            data: $("#search-form").serialize(),
+            success: function (rawData) {
+                console.log(rawData)
+                var parsed = JSON.parse(rawData);
+
                 if (!parsed) return;
-
-                var searchResult = $("#search-results");
-                searchResult.empty();
-
+                var elem = $('#search-results');
+                elem.empty();
                 parsed.forEach(function (result) {
-                    var row = $("<tr><td>" + result.Title + "</td><td>" + result.Author +
-                        "</td><td>" + result.Year + "</td><td>" + result.ID + "</td></tr>")
+                    var row = $("<tr><td>" + result.Title + "</td><td>"
+                        + result.Author + "</td><td>"
+                        + result.Year + "</td><td>"
+                        + result.ID + "</td></tr>"
+                    );
+                    elem.append(row)
+                });
 
-                    searchResult.append(row);
-
-                })
             }
+
         });
 
         return false
