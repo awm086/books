@@ -1,4 +1,12 @@
 <html>
+<head>
+    <style>
+        #search-results tr:hover {
+            background-color: lightgray;
+            cursor: pointer;
+        }
+    </style>
+</head>
 <body>
 
 <form id="search-form" onsubmit="return false">
@@ -11,9 +19,7 @@
     <tr style="text-align: left">
         <th width="40%">title</th>
         <th width="30%">Author</th>
-        <th width="10%">
-            <Year
-            /th>
+        <th width="10%">Year</th>
         <th width="20%">ID</th>
     </tr>
     </thead>
@@ -42,6 +48,12 @@
                         + result.ID + "</td></tr>"
                     );
                     elem.append(row)
+                    row.on('click', function () {
+                        $.ajax({
+                            url: "/books/add?id=" + result.ID,
+                            method: "GET"
+                        })
+                    });
                 });
 
             }
