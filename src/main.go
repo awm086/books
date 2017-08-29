@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"html/template"
 	_ "github.com/mattn/go-sqlite3"
 	"database/sql"
 	"encoding/json"
@@ -11,6 +10,7 @@ import (
 	"net/url"
 	"encoding/xml"
 	"github.com/codegangsta/negroni"
+	"github.com/yosssi/ace"
 )
 
 type Page struct {
@@ -50,7 +50,7 @@ func verifyDataBase(w http.ResponseWriter, r *http.Request, next http.HandlerFun
 	next(w,r)
 }
 func main() {
-	template := template.Must(template.ParseFiles("templates/index.html"))
+
 
 	mux := http.NewServeMux()
 	// db
@@ -58,15 +58,20 @@ func main() {
 
 	fmt.Println("hello world")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		template , err := ace.Load("templates/index", "", nil)
+		if err != nil  {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
 		p := Page{Name: "Gopher"}
 		name := r.FormValue("name")
 		if name != "" {
 			p.Name = name
 		}
 
-		err := template.ExecuteTemplate(w, "index.html", p)
-		if (err != nil) {
-			http.Error(w, "something went wrong", http.StatusInternalServerError)
+		err = template.Execute(w, p)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
 

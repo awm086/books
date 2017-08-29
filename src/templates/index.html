@@ -1,29 +1,29 @@
 <html>
 <head>
-    <style>
-        #search-results tr:hover {
-            background-color: lightgray;
-            cursor: pointer;
-        }
-    </style>
+  <style>
+    #search-results tr:hover {
+      background-color: lightgray;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
 
 <form id="search-form" onsubmit="return false">
-    <input name="search"/>
-    <input type="submit" value="Search" onclick="submitSearch()"/>
+  <input name="search"/>
+  <input type="submit" value="Search" onclick="submitSearch()"/>
 </form>
 
 <table width="100%">
-    <thead>
-    <tr style="text-align: left">
-        <th width="40%">title</th>
-        <th width="30%">Author</th>
-        <th width="10%">Year</th>
-        <th width="20%">ID</th>
-    </tr>
-    </thead>
-    <tbody id="search-results"></tbody>
+  <thead>
+  <tr style="text-align: left">
+    <th width="40%">title</th>
+    <th width="30%">Author</th>
+    <th width="10%">Year</th>
+    <th width="20%">ID</th>
+  </tr>
+  </thead>
+  <tbody id="search-results"></tbody>
 </table>
 <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js">
 </script>
