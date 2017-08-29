@@ -10,9 +10,10 @@ import (
 	"io/ioutil"
 	"net/url"
 	"encoding/xml"
+	"github.com/codegangsta/negroni"
 )
 
-type page struct {
+type Page struct {
 	Name     string
 	DBstatus bool
 }
@@ -39,17 +40,26 @@ type ClassifyBookResponse struct {
 	} `xml:"recommendations>dcc>mostpopular"`
 }
 
+var db *sql.DB
+
+func verifyDataBase(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	if err := db.Ping(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	next(w,r)
+}
 func main() {
 	template := template.Must(template.ParseFiles("templates/index.html"))
-	p := new(page)
-	p.Name = "GOPHER"
 
+	mux := http.NewServeMux()
 	// db
-	db, _ := sql.Open("sqlite3", "goweb.dev")
+	db, _ = sql.Open("sqlite3", "goweb.dev")
 
 	fmt.Println("hello world")
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		name := r.FormValue("name");
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		p := Page{Name: "Gopher"}
+		name := r.FormValue("name")
 		if name != "" {
 			p.Name = name
 		}
@@ -60,7 +70,7 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		var results []searchResult
 		var err error
 
@@ -74,14 +84,11 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/books/add", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/books/add", func(w http.ResponseWriter, r *http.Request) {
 
 		var book ClassifyBookResponse
 		var err error
 
-		if err = db.Ping(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
 
 		if book, err = find(r.FormValue("id")); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -104,8 +111,12 @@ func main() {
 
 	})
 
-	fmt.Println(http.ListenAndServe(":8080", nil))
+	n := negroni.Classic()
 
+	n.Use(negroni.HandlerFunc(verifyDataBase))
+	n.UseHandler(mux)
+
+	n.Run(":8080")
 }
 
 func search(query string) ([]searchResult, error) {
