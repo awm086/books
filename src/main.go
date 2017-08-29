@@ -14,8 +14,15 @@ import (
 )
 
 type Page struct {
-	Name     string
-	DBstatus bool
+	Books []Book
+}
+
+type Book struct {
+	PK 		int
+	Title  string
+	Author string
+	Year   string
+	Classification  string
 }
 
 type searchResult struct {
@@ -39,6 +46,7 @@ type ClassifyBookResponse struct {
 		MostPopular string `xml:"nsfa,attr"`
 	} `xml:"recommendations>dcc>mostpopular"`
 }
+
 
 var db *sql.DB
 
