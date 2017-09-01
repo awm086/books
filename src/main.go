@@ -12,6 +12,7 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/yosssi/ace"
 	"log"
+	gmux "github.com/gorilla/mux"
 )
 
 type Page struct {
@@ -61,7 +62,7 @@ func verifyDataBase(w http.ResponseWriter, r *http.Request, next http.HandlerFun
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Print("starting logging")
-	mux := http.NewServeMux()
+	mux := gmux
 	// db
 	db, _ = sql.Open("sqlite3", "goweb.dev")
 	defer db.Close()
