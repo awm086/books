@@ -3,13 +3,14 @@ html
   head
     = css
       #search-results tr:hover,
-      #view-results tr:hover {
+      #view-results tr:hover,
+      #view-page th:hover {
         background-color: lightgray;
         cursor: pointer;
       }
       #page-switcher {
         width: 100%;
-        align-content: center;
+        text-align: center;
       }
       #page-switcher button {
         font-size: 24px;
@@ -44,27 +45,49 @@ body
     table width="100%"
       thead
         tr style="text-align: left"
-          th width="40%" title
-          th width="30%" Author
-          th width="10%" Classification
+          th width="40%" onclick="sortBooks('title')" title
+          th width="30%" onclick="sortBooks('author')" Author
+          th width="10%" onclick="sortBooks('classification')" Classification
       tbody id="view-results"
         {{range .Books}}
           tr id="book-row-{{.PK}}"
             td {{.Title}}
             td {{.Author}}
             td {{.Classification}}
-            td 
+            td
               button class="btn-delete" onclick="deleteBook({{.PK}})" Delete
         {{end}}
 
-    
+
 
 script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"
 = javascript
+  function appendBook(book) {
+   $('#view-results').append("<tr id='book-row-" + book.PK + "'><td>" + book.Title + "</td><td>" + book.Author + "</td><td>" + book.Classification + "</td><td><button class=btn-delete onclick='deleteBook(" + book.PK + ")' </td>Delete</tr>")
+  }
+
+  function sortBooks(columnName) {
+    console.log(columnName)
+    $.ajax({
+      url: "/books?sortBy=" + columnName,
+      method: "GET",
+      success: function (result) {
+        var parsed = JSON.parse(result);
+        console.log(parsed)
+        if (!parsed) return;
+        $("#view-results").empty();
+        parsed.forEach(function (book) {      
+          appendBook(book);
+        });
+      }
+    })
+  }
+
   function showSearchPage() {
     $("#search-page").show()
     $("#view-page").hide()
   }
+
   function showViewPage() {
     $("#search-page").hide()
     $("#view-page").show()
@@ -72,13 +95,14 @@ script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"
 
   function deleteBook(pk) {
     $.ajax({
-      url: "/books/delete?pk=" +  + pk,
-      method: "GET",
+      url: "/books/" + pk,
+      method: "DELETE",
       success: function () {
         $("#book-row-" + pk).remove();
       }
     })
   }
+
   function submitSearch() {
     console.log('submitting search');
     $.ajax({
@@ -86,14 +110,11 @@ script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"
       method: "POST",
       data: $("#search-form").serialize(),
       success: function (rawData) {
-        console.log(rawData)
         var parsed = JSON.parse(rawData);
-
         if (!parsed) return;
         var elem = $('#search-results');
         elem.empty();
         parsed.forEach(function (result) {
-          console.log(result)
           var row = $("<tr><td>" + result.Title + "</td><td>"
             + result.Author + "</td><td>"
             + result.Year + "</td><td>"
@@ -102,12 +123,13 @@ script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"
           elem.append(row);
           row.on('click', function () {
             $.ajax({
-              url: "/books/add?id=" + result.ID,
-              method: "GET",
-              success: function(data) {
+              url: "/books?id=" + result.ID,
+              method: "PUT",
+              success: function (data) {
+                console.log("data", data)
                 var book = JSON.parse(data);
                 if (!book) return;
-                $("#view-results").append("<tr id='book-row-" + book.PK +"'><td>" + book.Title + "</td><td>"+ book.Author + "</td><td>" + book.Classification + "</td><td><button class=btn-delete onclick='deleteBook(" + book.PK + ")' </td>Delete</tr>")
+                appendBook(book)
               }
             })
           });
