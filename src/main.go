@@ -21,6 +21,7 @@ import (
 
 type Page struct {
 	Books []Book
+	Filter string
 }
 
 type Book struct {
@@ -73,15 +74,30 @@ func initDb() {
 	dbmap.CreateTablesIfNotExists()
 }
 
-func getBookCollection(books *[]Book, sort string,  writer http.ResponseWriter) bool{
-	if sort != "title" && sort != "author" && sort != "classification" {
+func getBookCollection(books *[]Book, sort string, filterBy string ,writer http.ResponseWriter) bool{
+	if sort == "" {
 		sort = "pk"
 	}
-	if _, err := dbmap.Select(books,"select * from books order by " + sort); err != nil {
+	var where string
+	if filterBy == "fiction" {
+		where = "where classification between '800' and '900'"
+	} else if filterBy == "nonfiction" {
+		where = "where classification not between '800' and '900'"
+	}
+	if _, err := dbmap.Select(books,"select * from books " + where +  " order by " + sort); err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return false
 	}
 	return true
+}
+
+func getStringFromSession(key string, r *http.Request) string {
+	var val string
+	if s := sessions.GetSession(r).Get(key); s!=nil {
+		val = s.(string)
+	}
+
+	return val
 }
 func main() {
 	initDb()
@@ -98,13 +114,10 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		p := Page{Books: []Book{}}
-		var sortCol string
-		if s := sessions.GetSession(r).Get("sort_by"); s!=nil {
-			sortCol = s.(string)
-		}
+		p := Page{Books: []Book{}, Filter:getStringFromSession("Filter", r)}
+		sortCol := getStringFromSession("sortBy", r)
 
-		if !getBookCollection(&p.Books, sortCol ,w) {
+		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r) ,w) {
 			return
 		}
 		if _, err = dbmap.Select(&p.Books,"select * from books"); err != nil {
@@ -120,7 +133,7 @@ func main() {
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
 		var b[]Book
-		if !getBookCollection(&b,r.FormValue("sortBy"), w) {
+		if !getBookCollection(&b,r.FormValue("sortBy"),getStringFromSession("Filter",r), w) {
 			return
 		}
 
@@ -134,8 +147,24 @@ func main() {
 		}
 
 
+	}).Methods("GET").Queries("sortBy", "{sortBy:title|author|classification}")
 
-	}).Methods("GET")
+	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
+		var b[]Book
+		if !getBookCollection(&b,r.FormValue("sortBy"), r.FormValue("filter"), w) {
+			return
+		}
+
+		session := sessions.GetSession(r)
+		session.Set("Filter", r.FormValue("filter"))
+
+		encoder := json.NewEncoder(w)
+		if err := encoder.Encode(b); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+	}).Methods("GET").Queries("filter", "{filter:all|fiction|nonfiction}")
 
 	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		var results []searchResult
