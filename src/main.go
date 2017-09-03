@@ -16,20 +16,21 @@ import (
 	gmux "github.com/gorilla/mux"
 	"github.com/goincremental/negroni-sessions"
 	"github.com/goincremental/negroni-sessions/cookiestore"
+	"golang.org/x/crypto/bcrypt"
 	"strconv"
 )
 
 type Page struct {
-	Books []Book
+	Books  []Book
 	Filter string
 }
 
 type Book struct {
-	PK 		int64 `db:"pk""`
-	Title  string `db:"title"`
-	Author string `db:"author"`
-	Classification  string `db:"classification"`
-	ID string `db:"id"`
+	PK             int64 `db:"pk""`
+	Title          string `db:"title"`
+	Author         string `db:"author"`
+	Classification string `db:"classification"`
+	ID             string `db:"id"`
 }
 
 type searchResult struct {
@@ -54,7 +55,6 @@ type ClassifyBookResponse struct {
 	} `xml:"recommendations>ddc>mostPopular"`
 }
 
-
 var db *sql.DB
 var dbmap *gorp.DbMap
 
@@ -63,18 +63,18 @@ func verifyDataBase(w http.ResponseWriter, r *http.Request, next http.HandlerFun
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	next(w,r)
+	next(w, r)
 }
 
 func initDb() {
 	db, _ = sql.Open("sqlite3", "goweb.dev")
 	dbmap = &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 
-	dbmap.AddTableWithName(Book{},"books").SetKeys(true,"pk")
+	dbmap.AddTableWithName(Book{}, "books").SetKeys(true, "pk")
 	dbmap.CreateTablesIfNotExists()
 }
 
-func getBookCollection(books *[]Book, sort string, filterBy string ,writer http.ResponseWriter) bool{
+func getBookCollection(books *[]Book, sort string, filterBy string, writer http.ResponseWriter) bool {
 	if sort == "" {
 		sort = "pk"
 	}
@@ -84,7 +84,7 @@ func getBookCollection(books *[]Book, sort string, filterBy string ,writer http.
 	} else if filterBy == "nonfiction" {
 		where = "where classification not between '800' and '900'"
 	}
-	if _, err := dbmap.Select(books,"select * from books " + where +  " order by " + sort); err != nil {
+	if _, err := dbmap.Select(books, "select * from books "+where+" order by "+sort); err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return false
 	}
@@ -93,7 +93,7 @@ func getBookCollection(books *[]Book, sort string, filterBy string ,writer http.
 
 func getStringFromSession(key string, r *http.Request) string {
 	var val string
-	if s := sessions.GetSession(r).Get(key); s!=nil {
+	if s := sessions.GetSession(r).Get(key); s != nil {
 		val = s.(string)
 	}
 
@@ -108,19 +108,37 @@ func main() {
 	// db
 
 	fmt.Println("hello world")
+
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+
+		if r.FormValue("register") != "" || r.FormValue("login") != "" {
+			http.Redirect(w,r,"/",http.StatusFound)
+			return
+		}
+
+		template, err := ace.Load("templates/login", "", nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		err = template.Execute(w, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		template , err := ace.Load("templates/index", "", nil)
-		if err != nil  {
+		template, err := ace.Load("templates/index", "", nil)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		p := Page{Books: []Book{}, Filter:getStringFromSession("Filter", r)}
+		p := Page{Books: []Book{}, Filter: getStringFromSession("Filter", r)}
 		sortCol := getStringFromSession("sortBy", r)
 
-		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r) ,w) {
+		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r), w) {
 			return
 		}
-		if _, err = dbmap.Select(&p.Books,"select * from books"); err != nil {
+		if _, err = dbmap.Select(&p.Books, "select * from books"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -132,8 +150,8 @@ func main() {
 	}).Methods("GET")
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
-		var b[]Book
-		if !getBookCollection(&b,r.FormValue("sortBy"),getStringFromSession("Filter",r), w) {
+		var b []Book
+		if !getBookCollection(&b, r.FormValue("sortBy"), getStringFromSession("Filter", r), w) {
 			return
 		}
 
@@ -146,12 +164,11 @@ func main() {
 			return
 		}
 
-
 	}).Methods("GET").Queries("sortBy", "{sortBy:title|author|classification}")
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
-		var b[]Book
-		if !getBookCollection(&b,r.FormValue("sortBy"), r.FormValue("filter"), w) {
+		var b []Book
+		if !getBookCollection(&b, r.FormValue("sortBy"), r.FormValue("filter"), w) {
 			return
 		}
 
@@ -194,13 +211,13 @@ func main() {
 		// check if book already added
 
 		b := Book{
-			PK:  -1,
-			Title: book.BookData.Title,
-			Author: book.BookData.Author,
+			PK:             -1,
+			Title:          book.BookData.Title,
+			Author:         book.BookData.Author,
 			Classification: book.Classification.MostPopular,
 		}
 
-		if err = dbmap.Insert(&b); err !=nil {
+		if err = dbmap.Insert(&b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -221,13 +238,12 @@ func main() {
 		var b Book
 		b.PK = pk
 
-		if _, err = dbmap.Delete(&b); err !=nil {
+		if _, err = dbmap.Delete(&b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		w.WriteHeader(http.StatusOK)
 
 	}).Methods("DELETE")
-
 
 	n := negroni.Classic()
 
@@ -238,8 +254,6 @@ func main() {
 
 	n.Run(":8080")
 }
-
-
 
 func search(query string) ([]searchResult, error) {
 	var c ClassifySearchResp

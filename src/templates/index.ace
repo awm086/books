@@ -68,6 +68,7 @@ body
 script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"
 = javascript
   $(document).ready(function(){
+      console.log({{.Filter}})
      $("#filter-view-results option[value='" + {{.Filter}} + "']").prop("selected", true);
   })
 
