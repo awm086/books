@@ -23,7 +23,13 @@ html
         background-color: #d9534f;
         border-radius: 8px;
       }
+      #user-info {
+        text-align: right;
+      }
 body
+  div#user-info
+    div you are logged in as {{.User}}
+    a href="/logout" Logout
   div#page-switcher
     button onclick="showViewPage()" View Library
     button onclick="showSearchPage()" Add Books

@@ -23,6 +23,11 @@ import (
 type Page struct {
 	Books  []Book
 	Filter string
+	User string
+}
+
+type LoginPage struct {
+	Error string
 }
 
 type Book struct {
@@ -31,6 +36,11 @@ type Book struct {
 	Author         string `db:"author"`
 	Classification string `db:"classification"`
 	ID             string `db:"id"`
+}
+
+type User struct {
+	Username string `db:"username"`
+	Secrete  []byte `db:"secret"`
 }
 
 type searchResult struct {
@@ -71,6 +81,7 @@ func initDb() {
 	dbmap = &gorp.DbMap{Db: db, Dialect: gorp.SqliteDialect{}}
 
 	dbmap.AddTableWithName(Book{}, "books").SetKeys(true, "pk")
+	dbmap.AddTableWithName(User{}, "users").SetKeys(false, "username")
 	dbmap.CreateTablesIfNotExists()
 }
 
@@ -91,14 +102,33 @@ func getBookCollection(books *[]Book, sort string, filterBy string, writer http.
 	return true
 }
 
+func verifyUser(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	if r.URL.Path == "/login" {
+		next(w,r)
+		return
+	}
+
+	// verify user exist in db
+	if username := getStringFromSession("User", r); username != "" {
+		log.Print("user name:" + username)
+		if user,_ := dbmap.Get(User{}, username); user != nil {
+			next(w,r)
+			return
+		}
+	}
+
+	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+}
+
 func getStringFromSession(key string, r *http.Request) string {
+	log.Print("kye:" + key)
 	var val string
 	if s := sessions.GetSession(r).Get(key); s != nil {
 		val = s.(string)
 	}
-
 	return val
 }
+
 func main() {
 	initDb()
 	defer dbmap.Db.Close()
@@ -110,29 +140,64 @@ func main() {
 	fmt.Println("hello world")
 
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		var p LoginPage
+		if r.FormValue("register") != "" {
+			secret, _ := bcrypt.GenerateFromPassword([]byte(r.FormValue("password")), bcrypt.DefaultCost)
+			user := User{Username: r.FormValue("username"), Secrete: secret}
+			if err := dbmap.Insert(&user); err != nil {
+				p.Error = err.Error()
+			} else {
+				http.Redirect(w, r, "/", http.StatusFound)
+				return
+			}
+		}
 
-		if r.FormValue("register") != "" || r.FormValue("login") != "" {
-			http.Redirect(w,r,"/",http.StatusFound)
-			return
+		if r.FormValue("login") != "" {
+			log.Print("user login")
+			user, err := dbmap.Get(User{}, r.FormValue("username"))
+			if err != nil {
+				p.Error = err.Error()
+			} else if user == nil {
+				p.Error = "User does not exist" + r.FormValue("username")
+			} else {
+				u := user.(*User)
+				if err = bcrypt.CompareHashAndPassword(u.Secrete, []byte(r.FormValue("password"))); err != nil {
+					p.Error = err.Error()
+				} else {
+
+					sessions.GetSession(r).Set("User", u.Username)
+					http.Redirect(w, r, "/", http.StatusFound)
+					return
+				}
+			}
+
 		}
 
 		template, err := ace.Load("templates/login", "", nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		err = template.Execute(w, nil)
+		err = template.Execute(w, p)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		sessions.GetSession(r).Set("User", nil)
+		sessions.GetSession(r).Set("Filter", nil)
+		http.Redirect(w,r,"/login",http.StatusFound)
+
+	})
+
+
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		template, err := ace.Load("templates/index", "", nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		p := Page{Books: []Book{}, Filter: getStringFromSession("Filter", r)}
+		p := Page{Books: []Book{}, Filter: getStringFromSession("Filter", r), User: getStringFromSession("User", r)}
 		sortCol := getStringFromSession("sortBy", r)
 
 		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r), w) {
@@ -247,9 +312,11 @@ func main() {
 
 	n := negroni.Classic()
 
-	n.Use(negroni.HandlerFunc(verifyDataBase))
+
 	store := cookiestore.New([]byte("secret123"))
 	n.Use(sessions.Sessions("my_session", store))
+	n.Use(negroni.HandlerFunc(verifyDataBase))
+	n.Use(negroni.HandlerFunc(verifyUser))
 	n.UseHandler(mux)
 
 	n.Run(":8080")
