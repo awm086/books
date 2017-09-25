@@ -48,7 +48,7 @@ body
       tbody id="search-results"
 
   div#view-page
-   form#filter-view-results style="float: right;"
+   form#filter-view-results
     select name="filter" style="font-size: 18px; min-width: 10em;" onchange="filterViewResults()"
       option value="all" All Books
       option value="fiction" Fiction

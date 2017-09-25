@@ -23,7 +23,7 @@ import (
 type Page struct {
 	Books  []Book
 	Filter string
-	User string
+	User   string
 }
 
 type LoginPage struct {
@@ -36,6 +36,7 @@ type Book struct {
 	Author         string `db:"author"`
 	Classification string `db:"classification"`
 	ID             string `db:"id"`
+	User           string `db:"user"`
 }
 
 type User struct {
@@ -85,17 +86,18 @@ func initDb() {
 	dbmap.CreateTablesIfNotExists()
 }
 
-func getBookCollection(books *[]Book, sort string, filterBy string, writer http.ResponseWriter) bool {
+func getBookCollection(books *[]Book, sort, filterBy, username string, writer http.ResponseWriter) bool {
 	if sort == "" {
 		sort = "pk"
 	}
 	var where string
+	where = " Where user=?"
 	if filterBy == "fiction" {
-		where = "where classification between '800' and '900'"
+		where = " AND classification between '800' and '900'"
 	} else if filterBy == "nonfiction" {
-		where = "where classification not between '800' and '900'"
+		where = " AND classification not between '800' and '900'"
 	}
-	if _, err := dbmap.Select(books, "select * from books "+where+" order by "+sort); err != nil {
+	if _, err := dbmap.Select(books, "select * from books "+where+" order by "+sort, username); err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return false
 	}
@@ -104,15 +106,15 @@ func getBookCollection(books *[]Book, sort string, filterBy string, writer http.
 
 func verifyUser(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if r.URL.Path == "/login" {
-		next(w,r)
+		next(w, r)
 		return
 	}
 
 	// verify user exist in db
 	if username := getStringFromSession("User", r); username != "" {
 		log.Print("user name:" + username)
-		if user,_ := dbmap.Get(User{}, username); user != nil {
-			next(w,r)
+		if user, _ := dbmap.Get(User{}, username); user != nil {
+			next(w, r)
 			return
 		}
 	}
@@ -186,12 +188,11 @@ func main() {
 	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		sessions.GetSession(r).Set("User", nil)
 		sessions.GetSession(r).Set("Filter", nil)
-		http.Redirect(w,r,"/login",http.StatusFound)
+		http.Redirect(w, r, "/login", http.StatusFound)
 
 	})
 
-
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		template, err := ace.Load("templates/index", "", nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -200,13 +201,13 @@ func main() {
 		p := Page{Books: []Book{}, Filter: getStringFromSession("Filter", r), User: getStringFromSession("User", r)}
 		sortCol := getStringFromSession("sortBy", r)
 
-		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r), w) {
+		if !getBookCollection(&p.Books, sortCol, getStringFromSession("Filter", r), getStringFromSession("User", r), w) {
 			return
 		}
-		if _, err = dbmap.Select(&p.Books, "select * from books"); err != nil {
+		/*if _, err = dbmap.Select(&p.Books, "select * from books"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
-		}
+		}*/
 
 		err = template.Execute(w, p)
 		if err != nil {
@@ -216,7 +217,8 @@ func main() {
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
 		var b []Book
-		if !getBookCollection(&b, r.FormValue("sortBy"), getStringFromSession("Filter", r), w) {
+
+		if !getBookCollection(&b, r.FormValue("sortBy"), getStringFromSession("Filter", r), getStringFromSession("User", r), w) {
 			return
 		}
 
@@ -233,7 +235,7 @@ func main() {
 
 	mux.HandleFunc("/books", func(w http.ResponseWriter, r *http.Request) {
 		var b []Book
-		if !getBookCollection(&b, r.FormValue("sortBy"), r.FormValue("filter"), w) {
+		if !getBookCollection(&b, r.FormValue("sortBy"), r.FormValue("filter"),  getStringFromSession("User", r), w) {
 			return
 		}
 
@@ -271,7 +273,6 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		// otherwise we have our book we need to save it to the db
-
 		log.Println(book)
 		// check if book already added
 
@@ -280,6 +281,8 @@ func main() {
 			Title:          book.BookData.Title,
 			Author:         book.BookData.Author,
 			Classification: book.Classification.MostPopular,
+			ID:             r.FormValue("id"),
+			User:           getStringFromSession("User", r),
 		}
 
 		if err = dbmap.Insert(&b); err != nil {
@@ -303,6 +306,12 @@ func main() {
 		var b Book
 		b.PK = pk
 
+		if err := dbmap.SelectOne(&b, "select * from books  where pk = ? AND  user=?", pk, getStringFromSession("User", r)); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			log.Println("del book not for user")
+			return
+		}
+
 		if _, err = dbmap.Delete(&b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -311,7 +320,6 @@ func main() {
 	}).Methods("DELETE")
 
 	n := negroni.Classic()
-
 
 	store := cookiestore.New([]byte("secret123"))
 	n.Use(sessions.Sessions("my_session", store))
