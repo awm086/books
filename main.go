@@ -1,25 +1,25 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	_ "github.com/mattn/go-sqlite3"
-	_ "github.com/lib/pq"
 	"database/sql"
-	"gopkg.in/gorp.v1"
 	"encoding/json"
-	"io/ioutil"
-	"net/url"
 	"encoding/xml"
-	"github.com/urfave/negroni"
-	"github.com/yosssi/ace"
-	"log"
-	gmux "github.com/gorilla/mux"
+	"fmt"
 	"github.com/goincremental/negroni-sessions"
 	"github.com/goincremental/negroni-sessions/cookiestore"
+	gmux "github.com/gorilla/mux"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/urfave/negroni"
+	"github.com/yosssi/ace"
 	"golang.org/x/crypto/bcrypt"
-	"strconv"
+	"gopkg.in/gorp.v1"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 )
 
 type Page struct {
@@ -33,7 +33,7 @@ type LoginPage struct {
 }
 
 type Book struct {
-	PK             int64 `db:"pk""`
+	PK             int64  `db:"pk""`
 	Title          string `db:"title"`
 	Author         string `db:"author"`
 	Classification string `db:"classification"`
@@ -47,10 +47,10 @@ type User struct {
 }
 
 type searchResult struct {
-	Title  string  `xml:"title,attr"`
-	Author string  `xml:"author,attr"`
-	Year   string  `xml:"hyr,attr"`
-	ID     string  `xml:"owi,attr"`
+	Title  string `xml:"title,attr"`
+	Author string `xml:"author,attr"`
+	Year   string `xml:"hyr,attr"`
+	ID     string `xml:"owi,attr"`
 }
 
 type ClassifySearchResp struct {
@@ -59,9 +59,9 @@ type ClassifySearchResp struct {
 
 type ClassifyBookResponse struct {
 	BookData struct {
-		Title  string  `xml:"title,attr"`
-		Author string  `xml:"author,attr"`
-		ID     string  `xml:"owi>attr"`
+		Title  string `xml:"title,attr"`
+		Author string `xml:"author,attr"`
+		ID     string `xml:"owi>attr"`
 	} `xml:"work""`
 	Classification struct {
 		MostPopular string `xml:"nsfa,attr"`
